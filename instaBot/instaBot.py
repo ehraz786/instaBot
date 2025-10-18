@@ -53,6 +53,9 @@ async def message_handler(message):
             download_comments=False
         )
 
+        # Load session into the existing local instance
+        L.load_session_from_file(username=None, filename=SESSION_FILE_PATH)
+
         url = message.text.strip()
         await bot.send_chat_action(message.chat.id, "typing")
         status_msg = await bot.reply_to(message, "📥 Downloading reel... Please wait.")
@@ -82,38 +85,6 @@ async def message_handler(message):
             with open(video_path, 'rb') as video:
                 await bot.send_video(message.chat.id, video)
 
-        except instaloader.exceptions.ConnectionException as e:
-            pass
-
-        except instaloader.exceptions.InstaloaderException as e:
-            # --- FIRST ATTEMPT FAILED, TRYING AGAIN LOGGED IN ---
-            await bot.edit_message_text("⚠️ Anonymous download failed. Retrying with a logged-in session...", chat_id=message.chat.id, message_id=status_msg.message_id)
-        
-            try:
-                # Load session into the existing local instance
-                L.load_session_from_file(username=None, filename=SESSION_FILE_PATH)
-
-                # Retry Download
-                post = instaloader.Post.from_shortcode(L.context, shortcode)
-                L.download_post(post, target=shortcode)
-
-                # Find the downloaded mp4 file
-                mp4_files = glob.glob(os.path.join(target_dir, "*.mp4"), recursive=True)
-
-                if not mp4_files:
-                    await bot.edit_message_text("❌ Could not find the video file.", chat_id=message.chat.id, message_id=status_msg.message_id)
-                    return
-                
-                await bot.edit_message_text(chat_id=message.chat.id, message_id=status_msg.message_id, text="🎬 Here's your reel! 👇🏻")
-                await bot.send_chat_action(message.chat.id, "upload_video")
-
-                video_path = mp4_files[0]
-                with open(video_path, 'rb') as video:
-                    await bot.send_video(message.chat.id, video)
-
-            except Exception as final_e:
-                await bot.edit_message_text(f"❌ Login successful, but still could not download.\n`{final_e}`", chat_id=message.chat.id, message_id=status_msg.message_id)        
-
         except Exception as e:
             await bot.edit_message_text(f"❌ Failed to download: {str(e)}", chat_id=message.chat.id, message_id=status_msg.message_id)
 
@@ -128,6 +99,9 @@ async def message_handler(message):
             save_metadata=False,
             download_comments=False
         )
+
+        # # Load session into the existing local instance
+        L.load_session_from_file(username=None, filename=SESSION_FILE_PATH)
 
         url = message.text.strip()
 
@@ -154,8 +128,6 @@ async def message_handler(message):
             media_files = glob.glob(os.path.join(target_dir, "*.jpg")) + \
                 glob.glob(os.path.join(target_dir, "*.mp4"))
             
-            #media_files.sort()
-            # Use the custom sort function instead of a simple .sort()
             media_files.sort(key=sort_key_instaloader)
 
             if not media_files:
@@ -186,60 +158,6 @@ async def message_handler(message):
                         await bot.send_photo(message.chat.id, file)
                     elif media_path.endswith(".mp4"):
                         await bot.send_video(message.chat.id, file)
-
-        except instaloader.exceptions.ConnectionException as e:
-            pass
-
-        except instaloader.exceptions.InstaloaderException as e:
-            # --- FIRST ATTEMPT FAILED, TRYING AGAIN LOGGED IN ---
-            await bot.edit_message_text("⚠️ Anonymous download failed. Retrying with a logged-in session...", chat_id=message.chat.id, message_id=status_msg.message_id)
-            
-            try:
-                # Load session into the existing local instance
-                L.load_session_from_file(username=None, filename=SESSION_FILE_PATH)
-
-                # Retry Download
-                post = instaloader.Post.from_shortcode(L.context, shortcode)
-                L.download_post(post, target=shortcode)
-
-                media_files = glob.glob(os.path.join(target_dir, "*.jpg")) + \
-                glob.glob(os.path.join(target_dir, "*.mp4"))
-            
-                #media_files.sort()
-                # Use the custom sort function instead of a simple .sort()
-                media_files.sort(key=sort_key_instaloader)
-
-                if not media_files:
-                    await bot.edit_message_text("❌ Could not find any media in this post.", chat_id=message.chat.id, message_id=status_msg.message_id)
-                    return
-            
-                await bot.edit_message_text(f"🎬 Here's your post! 👇🏻", chat_id=message.chat.id, message_id=status_msg.message_id)
-
-                files_to_send = []
-                if img_index is not None:
-                    # User wants a specific item
-                    if 0 <= img_index < len(media_files):
-                        # Valid index, select the specific file (adjust for 0-based index)
-                        files_to_send.append(media_files[img_index])
-                        #await bot.edit_message_text(f"📤 Found {len(media_files)} item(s). Uploading item #{img_index}...", chat_id=message.chat.id, message_id=status_msg.message_id)
-                    else:
-                        # Invalid index
-                        await bot.edit_message_text(f"❌ Invalid index. This post has {len(media_files)} items, but you requested item #{img_index}.", chat_id=message.chat.id, message_id=status_msg.message_id)
-                        return # Stop execution
-                else:
-                    # No specific index, send all files
-                    files_to_send = media_files
-
-                # Loop through the selected files and send them       
-                for media_path in files_to_send:
-                    with open(media_path, 'rb') as file:
-                        if media_path.endswith(".jpg"):
-                            await bot.send_photo(message.chat.id, file)
-                        elif media_path.endswith(".mp4"):
-                            await bot.send_video(message.chat.id, file)
-            
-            except Exception as final_e:
-                await bot.edit_message_text(f"❌ Login successful, but still could not download.\n`{final_e}`", chat_id=message.chat.id, message_id=status_msg.message_id)
 
         except Exception as e:
             await bot.edit_message_text(f"An unexpected error occurred: {e}", chat_id=message.chat.id, message_id=status_msg.message_id)
